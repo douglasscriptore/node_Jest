@@ -1,13 +1,26 @@
 const request = require("supertest");
+const nodemailer = require("nodemailer");
+
 const app = require("../../src/app");
-// const { User } = require("../../src/app/models");
 const truncate = require("../utils/truncate");
 
 const factory = require("../factories");
 
+// toda vez que que o jest utilizar o nodemailer ele faz criar um módulo fake
+jest.mock("nodemailer");
+
+//objeto que eequivale ao transporter do nodemailer
+const trasnport = {
+  sendMail: jest.fn() //mock de uma funcao sem resultado, porèm monitoravel
+};
+
 describe("Authentication", () => {
   beforeEach(async () => {
     await truncate();
+  });
+
+  beforeAll(() => {
+    nodemailer.createTransport.mockReturnValue(trasnport);
   });
 
   it("should be able to authenticate with valid credentials", async () => {
@@ -66,5 +79,16 @@ describe("Authentication", () => {
       .get("/dashboard")
       .set("Authorization", "Bearer 123123");
     expect(response.status).toBe(401);
+  });
+  it("should receive email notificantion when authenticated", async () => {
+    const user = await factory.create("User", {
+      password: "123123"
+    });
+
+    const response = await request(app)
+      .post("/sessions")
+      .send({ email: user.email, password: "123123" });
+
+    expect(trasnport.sendMail).toHaveBeenCalledTimes(1);
   });
 });
